@@ -2,7 +2,8 @@
 import sys
 import os
 
-# Add the parent directory sys.path
+# Add the parent directories to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 import tensorflow as tf
@@ -12,6 +13,7 @@ from src.dc_solver import DCSolver
 from src.layers.dense import DenseLayer
 from src.layers.current import CurrentLayer
 from src.layers.input_voltage import InputVoltageLayer
+from utils.load_datasets import load_mnist_dataset
 from src.ep_alg import EqProp
 # >>>
 
@@ -20,44 +22,6 @@ np.random.seed(42)
 
 TF_DTYPE = tf.float64
 NP_DTYPE = np.float64
-
-# load dataset from file <<<
-def load_dataset(dataset_size=1000, x_scale=100.0, y_scale=1.0, normalize=True, reshape=False, stack=False):
-    dataset_directory = "/home/medwatt/jupyter/nn_models/mnist_full/"
-    X_train = np.load(f"{dataset_directory}x_train.npy")[:dataset_size]
-    Y_train = np.load(f"{dataset_directory}y_train.npy")[:dataset_size]
-    X_test = np.load(f"{dataset_directory}x_test.npy")[:dataset_size]
-    Y_test = np.load(f"{dataset_directory}y_test.npy")[:dataset_size]
-
-    mean = 33.318421449829934
-    std = 78.56748998339798
-    X_train = (X_train - mean) / std
-    X_test = (X_test - mean) / std
-
-    X_train = x_scale * X_train
-    X_test = x_scale * X_test
-    Y_train = y_scale * Y_train
-    Y_test = y_scale * Y_test
-
-    if reshape:
-        X_train = X_train.reshape(-1, 28, 28)
-        X_test = X_test.reshape(-1, 28, 28)
-        if stack:
-            # Stack positive and negative as separate channels.
-            X_train = np.stack([X_train, -X_train], axis=-1)
-            X_test = np.stack([X_test, -X_test], axis=-1)
-    elif stack:
-        # Concatenate along feature dimension (as in the original code).
-        X_train = np.concatenate([X_train, -X_train], axis=1)
-        X_test = np.concatenate([X_test, -X_test], axis=1)
-
-    X_train = X_train.astype(NP_DTYPE)
-    X_test = X_test.astype(NP_DTYPE)
-    Y_train = Y_train.astype(NP_DTYPE)
-    Y_test = Y_test.astype(NP_DTYPE)
-
-    return (X_train, Y_train), (X_test, Y_test)
-# >>>
 
 # create dataset batches <<<
 def create_dataset(x, y, batch_size=32):
@@ -84,7 +48,7 @@ if __name__ == "__main__":
         "roff": 1e20
     }
 
-    (X_train, Y_train),( X_test, Y_test) = load_dataset(dataset_size=5000, stack=True)
+    (X_train, Y_train), (X_test, Y_test) = load_mnist_dataset(dataset_size=1000, reshape=False, stack=True, dtype=NP_DTYPE)
     dataset = create_dataset(X_train, Y_train, batch_size=batch_size)
 
     model = [

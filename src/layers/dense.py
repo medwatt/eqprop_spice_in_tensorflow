@@ -124,4 +124,4 @@ class DenseLayer(CircuitLayer):
             nudge_sq = tf.square(nudge_diff)
             grad_estimate = tf.reduce_mean(nudge_sq - free_sq, axis=0) / beta
             self.optimizer.apply_gradients([(grad_estimate, self.weights)])
-            self.weights.assign(tf.clip_by_value(self.weights, 1e-7, 1e-5))
+            self.weights.assign(tf.clip_by_value(self.weights, self.g_range[0], self.g_range[1]))

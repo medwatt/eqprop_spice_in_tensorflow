@@ -27,10 +27,10 @@ class InputVoltageLayer(CircuitLayer):
     def jacobi_method(self, previous_layer, next_layer, tolerance):
         return True
 
-    def get_netlist(self, nodes, x_batch=None, **kwargs):
+    def get_netlist(self, nodes, x_batch=None, sample_idx=0):
         lines = []
 
-        forced_voltage = self.voltage[0].numpy().flatten()
+        forced_voltage = self.voltage[sample_idx].numpy().flatten()
         for idx, node in enumerate(nodes):
             lines.append(f"V_in_{idx} {node} 0 DC {forced_voltage[idx]:.6e}")
         return lines

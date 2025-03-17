@@ -40,11 +40,11 @@ class CurrentLayer(CircuitLayer):
     def jacobi_method(self, previous_layer, next_layer, tolerance=1e-6):
         return True
 
-    def get_netlist(self, prev_nodes, curr_nodes, layer_index, **kwargs):
+    def get_netlist(self, prev_nodes, curr_nodes, layer_index, sample_idx=0):
         if not self.enabled:
             return []
         lines = []
-        forced_current = self.current[0].numpy().flatten()
+        forced_current = self.current[sample_idx].numpy().flatten()
         for idx, node in enumerate(prev_nodes):
             lines.append(f"I_in_{idx} {node} 0 DC {forced_current[idx]:.10e}")
         return lines

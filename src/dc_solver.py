@@ -63,7 +63,7 @@ class DCSolver:
 
         return [layer.voltage for layer in self.model]
 
-    def export_spice_netlist(self, x_batch=None):
+    def export_spice_netlist(self, x_batch=None, sample_idx=0):
         if not self.built:
             raise ValueError("Model not built. Run solve_dc or build the model first.")
         netlist = ["* SPICE netlist generated from TensorFlow model"]
@@ -72,11 +72,11 @@ class DCSolver:
             num_nodes = int(np.prod(layer.output_shape[1:]))
             nodes = [f"L{idx}_N{n}" for n in range(num_nodes)]
             nodes_by_layer.append(nodes)
-        netlist.extend(self.model[0].get_netlist(nodes_by_layer[0], x_batch=x_batch))
+        netlist.extend(self.model[0].get_netlist(nodes_by_layer[0], x_batch=x_batch, sample_idx=sample_idx))
         for i in range(1, len(self.model)):
             prev_nodes = nodes_by_layer[i - 1]
             curr_nodes = nodes_by_layer[i]
-            netlist.extend(self.model[i].get_netlist(prev_nodes, curr_nodes, i))
+            netlist.extend(self.model[i].get_netlist(prev_nodes, curr_nodes, i, sample_idx=sample_idx))
         last_layer = self.model[-1]
         last_layer_index = len(self.model) - 1
         if isinstance(self.model[-1], CurrentLayer):
@@ -87,8 +87,8 @@ class DCSolver:
         netlist.append(".end")
         return "\n".join(netlist)
 
-    def write_netlist(self, filename="netlist.sp"):
-        netlist_str = self.export_spice_netlist()
+    def write_netlist(self, sample_idx=0, filename="netlist.sp"):
+        netlist_str = self.export_spice_netlist(sample_idx=sample_idx)
         with open(filename, "w") as f:
             f.write(netlist_str)
         print(f"Netlist written to {filename}")

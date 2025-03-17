@@ -4,8 +4,6 @@ from .base import CircuitLayer
 from .input_voltage import InputVoltageLayer
 from .diode import Diode
 
-# TODO: This code doesn't return correct results for batch sizes greater than 1
-
 class Conv2DLayer(CircuitLayer):
     def __init__(
         self,
@@ -17,8 +15,8 @@ class Conv2DLayer(CircuitLayer):
         diodes_enabled=False,
         diode_params=None,
         dtype=tf.float64,
-        trainable=False,      # New parameter
-        lr=1e-7,              # New parameter
+        trainable=False,
+        lr=1e-7,
     ):
         self.filters = filters
         self.kernel_size = kernel_size
@@ -36,26 +34,30 @@ class Conv2DLayer(CircuitLayer):
     def build(self, input_shape):
         self.input_shape = input_shape  # (batch_size, H, W, channels)
         self.batch_size = input_shape[0]
-        in_channels = input_shape[-1]
+        self.in_channels = input_shape[-1]
         kh, kw = self.kernel_size
+
         self.kernel = tf.Variable(
             tf.random.uniform(
-                (kh, kw, in_channels, self.filters),
+                (kh, kw, self.in_channels, self.filters),
                 minval=self.g_range[0],
                 maxval=self.g_range[1],
                 dtype=self.dtype,
             ),
             trainable=False,
         )
-        if self.trainable:
-            self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr)
+
         if self.padding == "SAME":
             out_height = int(np.ceil(input_shape[1] / self.strides[1]))
             out_width = int(np.ceil(input_shape[2] / self.strides[2]))
         else:  # VALID
             out_height = int(np.ceil((input_shape[1] - kh + 1) / self.strides[1]))
             out_width = int(np.ceil((input_shape[2] - kw + 1) / self.strides[2]))
+
         self.output_shape = (self.batch_size, out_height, out_width, self.filters)
+
+        if self.trainable:
+            self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.lr)
 
     def initialize_voltage(self):
         self.voltage = tf.Variable(tf.zeros(self.output_shape, dtype=self.dtype))
@@ -151,7 +153,63 @@ class Conv2DLayer(CircuitLayer):
 
     def update_weights(self, free_prev, free_curr, nudge_prev, nudge_curr, beta):
         if self.trainable:
-            print("Not implemented yet!")
-            exit()
 
+            # Get kernel dimensions.
+            kh, kw = self.kernel_size
+            in_channels = free_prev.shape[-1]
 
+            # Extract patches from the free and nudge input voltages.
+            # Unrolling, each patch has size: kh*kw*in_channels.
+            # patches_free have shape: (batch_size, nh, nw, patch_size).
+            patches_free = tf.image.extract_patches(
+                images=free_prev,
+                sizes=[1, kh, kw, 1],
+                strides=self.strides,
+                rates=[1, 1, 1, 1],
+                padding=self.padding
+            )
+            patches_nudge = tf.image.extract_patches(
+                images=nudge_prev,
+                sizes=[1, kh, kw, 1],
+                strides=self.strides,
+                rates=[1, 1, 1, 1],
+                padding=self.padding
+            )
+
+            # Expand dimensions to allow broadcasting when computing differences.
+            # free_curr: (batch_size, H_out, W_out, filters) -> (batch_size, H_out, W_out, filters, 1)
+            free_curr_exp = tf.expand_dims(free_curr, axis=-1)
+            # patches_free: (batch_size, H_out, W_out, patch_size) -> (batch_size, H_out, W_out, 1, patch_size)
+            patches_free_exp = tf.expand_dims(patches_free, axis=3)
+            # Compute the difference for the free phase.
+            free_diff = free_curr_exp - patches_free_exp
+            free_sq = tf.square(free_diff)
+
+            # Repeat for the nudge phase.
+            nudge_curr_exp = tf.expand_dims(nudge_curr, axis=-1)
+            patches_nudge_exp = tf.expand_dims(patches_nudge, axis=3)
+            nudge_diff = nudge_curr_exp - patches_nudge_exp
+            nudge_sq = tf.square(nudge_diff)
+
+            # Compute the gradient estimate as the mean difference of squared differences.
+            # This is averaged over batch, but summed over spatial dimensions.
+            diff = nudge_sq - free_sq  # Shape: (batch_size, H_out, W_out, filters, patch_size)
+            # Average over the batch dimension.
+            batch_mean = tf.reduce_mean(diff, axis=0)  # Shape: (H_out, W_out, filters, patch_size)
+            # Sum contributions from all patches (spatial dimensions).
+            patch_sum = tf.reduce_sum(batch_mean, axis=[0, 1])  # Shape: (filters, patch_size)
+            # Scale by the nudging factor.
+            grad_estimate = patch_sum / beta  # Shape: (filters, patch_size)
+
+            # Transpose to get patch_size in the first dimension.
+            grad_estimate = tf.transpose(grad_estimate, perm=[1, 0])  # Shape: (patch_size, filters)
+            # Reshape to match kernel shape: (kh, kw, in_channels, filters)
+            grad_estimate = tf.reshape(grad_estimate, (kh, kw, in_channels, self.filters))
+
+            # Apply the gradient update.
+            self.optimizer.apply_gradients([(grad_estimate, self.kernel)])
+
+            # Clip the kernel weights to remain within the specified range.
+            self.kernel.assign(tf.clip_by_value(self.kernel, self.g_range[0], self.g_range[1]))
+
+            # print(self.kernel)

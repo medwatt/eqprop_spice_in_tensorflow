@@ -1,8 +1,9 @@
+import os
 import numpy as np
 import tensorflow as tf
 
 # save mnist dataset to file <<<
-def save_mnist_dataset(path="./"):
+def save_mnist_dataset(path="./mnist/"):
     (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
 
     x_train = x_train.reshape(x_train.shape[0], -1)
@@ -11,15 +12,24 @@ def save_mnist_dataset(path="./"):
     y_train = tf.keras.utils.to_categorical(y_train, 10)
     y_test = tf.keras.utils.to_categorical(y_test, 10)
 
-    np.save(f'{path}x_train.npy', x_train)
-    np.save(f'{path}y_train.npy', y_train)
-    np.save(f'{path}x_test.npy', x_test)
-    np.save(f'{path}y_test.npy', y_test)
+    np.save(f"{path}x_train.npy", x_train)
+    np.save(f"{path}y_train.npy", y_train)
+    np.save(f"{path}x_test.npy", x_test)
+    np.save(f"{path}y_test.npy", y_test)
 # >>>
 
 # load mnist dataset from file <<<
-def load_mnist_dataset(dataset_size=1000, x_scale=10.0, y_scale=1.0, normalize=True, reshape=False, stack=False, dtype=np.float32):
-    dataset_directory = "/home/medwatt/jupyter/nn_models/mnist_full/"
+def load_mnist_dataset(
+    dataset_size=1000,
+    x_scale=10.0,
+    y_scale=1.0,
+    normalize=True,
+    reshape=False,
+    stack=False,
+    dtype=np.float32,
+):
+    script_directory = os.path.dirname(os.path.realpath(__file__))
+    dataset_directory = os.path.join(script_directory, "mnist/")
     X_train = np.load(f"{dataset_directory}x_train.npy")[:dataset_size]
     Y_train = np.load(f"{dataset_directory}y_train.npy")[:dataset_size]
     X_test = np.load(f"{dataset_directory}x_test.npy")[:dataset_size]
@@ -58,3 +68,7 @@ def load_mnist_dataset(dataset_size=1000, x_scale=10.0, y_scale=1.0, normalize=T
 
     return (X_train, Y_train), (X_test, Y_test)
 # >>>
+
+if __name__ == "__main__":
+    save_mnist_dataset()
+

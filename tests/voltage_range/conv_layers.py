@@ -13,7 +13,7 @@ from src.layers.dense import DenseLayer
 from src.layers.conv2d import Conv2DLayer
 from src.layers.current import CurrentLayer
 from src.layers.input_voltage import InputVoltageLayer
-from utils.load_datasets import load_mnist_dataset
+from utils.load_mnist_dataset import load_mnist_dataset
 from src.voltage_analyzer import VoltageRangeAnalyzer
 # >>>
 
